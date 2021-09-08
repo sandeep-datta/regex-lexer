@@ -30,8 +30,8 @@
 //! assert_eq!(
 //!     lexer.tokens(source).collect::<Vec<_>>(),
 //!     vec![
-//!         Token::Open, Token::Num(1), Token::Add, Token::Num(2), Token::Close,
-//!         Token::Mul, Token::Num(3)
+//!         Ok(Token::Open), Ok(Token::Num(1)), Ok(Token::Add), Ok(Token::Num(2)), Ok(Token::Close),
+//!         Ok(Token::Mul), Ok(Token::Num(3))
 //!     ],
 //! );
 //! # Ok::<(), regex::Error>(())
@@ -90,7 +90,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     ///
     /// assert_eq!(
     ///     lexer.tokens("1 2 3").collect::<Vec<_>>(),
-    ///     vec![Token::Num(1), Token::Num(2), Token::Num(3)],
+    ///     vec![Ok(Token::Num(1)), Ok(Token::Num(2)), Ok(Token::Num(3))],
     /// );
     /// # Ok::<(), regex::Error>(())
     /// ```
@@ -111,8 +111,8 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     ///     // ...
     ///     .build()?;
     ///
-    /// assert_eq!(lexer.tokens("then").next(), Some(Token::Then));
-    /// assert_eq!(lexer.tokens("then_perish").next(), Some(Token::Ident("then_perish")));
+    /// assert_eq!(lexer.tokens("then").next(), Some(Ok(Token::Then)));
+    /// assert_eq!(lexer.tokens("then_perish").next(), Some(Ok(Token::Ident("then_perish"))));
     /// # Ok::<(), regex::Error>(())
     /// ```
     pub fn token<F>(mut self, re: &'r str, f: F) -> Self
@@ -164,7 +164,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
 ///
 /// # assert_eq!(
 /// #    tokens.collect::<Vec<_>>(),
-/// #    vec![Token::Ident("these"), Token::Ident("are"), Token::Ident("some"), Token::Ident("identifiers")],
+/// #    vec![Ok(Token::Ident("these")), Ok(Token::Ident("are")), Ok(Token::Ident("some")), Ok(Token::Ident("identifiers"))],
 /// # );
 /// # Ok::<(), regex::Error>(())
 /// ```
@@ -208,9 +208,9 @@ pub struct Tokens<'l, 't, T: 't> {
 }
 
 impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
-    type Item = T;
+    type Item = Result<T, ()>;
 
-    fn next(&mut self) -> Option<T> {
+    fn next(&mut self) -> Option<Self::Item> {
         loop {
             if self.position == self.source.len() {
                 return None;
@@ -218,22 +218,28 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
 
             let string = &self.source[self.position..];
             let match_set = self.lexer.regex_set.matches(string);
-            let (len, i) = match_set
+            let matches = match_set
                 .into_iter()
                 .map(|i: usize| {
                     let m = self.lexer.regexes[i].find(string).unwrap();
                     assert!(m.start() == 0);
                     (m.end(), i)
                 })
-                .max_by_key(|(len, _)| *len)
-                .unwrap();
+                .max_by_key(|(len, _)| *len);
+
+            let matches = match matches {
+                Some(matches) => matches,
+                None => return Some(Err(())),
+            };
+
+            let (len, i) = matches;
 
             let tok_str = &self.source[self.position..self.position + len];
             let start = self.position;
             self.position += len;
             let func = &self.lexer.fns[i];
             match func(start, tok_str, self.position) {
-                Some(tok) => return Some(tok),
+                Some(tok) => return Some(Ok(tok)),
                 None => {}
             }
         }
