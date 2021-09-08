@@ -208,7 +208,7 @@ pub struct Tokens<'l, 't, T: 't> {
 }
 
 impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
-    type Item = Result<T, ()>;
+    type Item = Result<T, usize>;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
@@ -229,7 +229,7 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
 
             let matches = match matches {
                 Some(matches) => matches,
-                None => return Some(Err(())),
+                None => return Some(Err(self.position)),
             };
 
             let (len, i) = matches;
