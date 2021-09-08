@@ -16,14 +16,14 @@
 //! }
 //!
 //! let lexer = LexerBuilder::new()
-//!     .token(r"[0-9]+", |tok| Some(Token::Num(tok.parse().unwrap())))
-//!     .token(r"\+", |_| Some(Token::Add))
-//!     .token(r"-", |_| Some(Token::Sub))
-//!     .token(r"\*", |_| Some(Token::Mul))
-//!     .token(r"/", |_| Some(Token::Div))
-//!     .token(r"\(", |_| Some(Token::Open))
-//!     .token(r"\)", |_| Some(Token::Close))
-//!     .token(r"\s+", |_| None) // skip whitespace
+//!     .token(r"[0-9]+", |_, tok, _| Some(Token::Num(tok.parse().unwrap())))
+//!     .token(r"\+", |_, _, _| Some(Token::Add))
+//!     .token(r"-", |_, _, _| Some(Token::Sub))
+//!     .token(r"\*", |_, _, _| Some(Token::Mul))
+//!     .token(r"/", |_, _, _| Some(Token::Div))
+//!     .token(r"\(", |_, _, _| Some(Token::Open))
+//!     .token(r"\)", |_, _, _| Some(Token::Close))
+//!     .token(r"\s+", |_, _, _| None) // skip whitespace
 //!     .build()?;
 //!
 //! let source = "(1 + 2) * 3";
@@ -42,7 +42,7 @@ use regex::{Regex, RegexSet};
 /// Builder struct for [Lexer](struct.Lexer.html).
 pub struct LexerBuilder<'r, 't, T: 't> {
     regexes: Vec<&'r str>,
-    fns: Vec<Box<dyn Fn(&'t str) -> Option<T>>>,
+    fns: Vec<Box<dyn Fn(usize, &'t str, usize) -> Option<T>>>,
 }
 
 impl<'r, 't, T: 't> std::fmt::Debug for LexerBuilder<'r, 't, T> {
@@ -83,8 +83,8 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     /// }
     ///
     /// let lexer = regex_lexer::LexerBuilder::new()
-    ///     .token(r"[0-9]*", |num| Some(Token::Num(num.parse().unwrap())))
-    ///     .token(r"\s+", |_| None) // skip whitespace
+    ///     .token(r"[0-9]*", |_, num, _| Some(Token::Num(num.parse().unwrap())))
+    ///     .token(r"\s+", |_, _, _| None) // skip whitespace
     ///     // ...
     ///     .build()?;
     ///
@@ -106,8 +106,8 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     /// }
     ///
     /// let lexer = regex_lexer::LexerBuilder::new()
-    ///     .token(r"[a-zA-Z_][a-zA-Z0-9_]*", |id| Some(Token::Ident(id)))
-    ///     .token(r"then", |_| Some(Token::Then))
+    ///     .token(r"[a-zA-Z_][a-zA-Z0-9_]*", |_, id, _| Some(Token::Ident(id)))
+    ///     .token(r"then", |_, _, _| Some(Token::Then))
     ///     // ...
     ///     .build()?;
     ///
@@ -117,7 +117,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     /// ```
     pub fn token<F>(mut self, re: &'r str, f: F) -> Self
     where
-        F: Fn(&'t str) -> Option<T> + 'static,
+        F: Fn(usize, &'t str, usize) -> Option<T> + 'static,
     {
         self.regexes.push(re);
         self.fns.push(Box::new(f));
@@ -155,8 +155,8 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
 /// }
 ///
 /// let lexer = regex_lexer::LexerBuilder::new()
-///     .token(r"\p{XID_Start}\p{XID_Continue}*", |id| Some(Token::Ident(id)))
-///     .token(r"\s+", |_| None) // skip whitespace
+///     .token(r"\p{XID_Start}\p{XID_Continue}*", |_, id, _| Some(Token::Ident(id)))
+///     .token(r"\s+", |_, _, _| None) // skip whitespace
 ///     // ...
 ///     .build()?;
 ///
@@ -169,7 +169,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
 /// # Ok::<(), regex::Error>(())
 /// ```
 pub struct Lexer<'t, T: 't> {
-    fns: Vec<Box<dyn Fn(&'t str) -> Option<T>>>,
+    fns: Vec<Box<dyn Fn(usize, &'t str, usize) -> Option<T>>>,
     regexes: Vec<Regex>,
     regex_set: RegexSet,
 }
@@ -229,9 +229,10 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
                 .unwrap();
 
             let tok_str = &self.source[self.position..self.position + len];
+            let start = self.position;
             self.position += len;
             let func = &self.lexer.fns[i];
-            match func(tok_str) {
+            match func(start, tok_str, self.position) {
                 Some(tok) => return Some(tok),
                 None => {}
             }
