@@ -1,18 +1,15 @@
 [package]
-name = "regex-lexer"
+name = "regex-lexer-lalrpop"
 version = "0.1.0" # remember to change html_root_url
-authors = ["Gwenhwyfar Hartshaw <ghartshaw@gmail.com>"]
+authors = ["Gwenhwyfar Hartshaw <ghartshaw@gmail.com>", "Sandeep Datta <datta.sandeep@gmail.com>"]
 edition = "2018"
 description = "A regex-based lexer (tokenizer)"
 readme = "README.md"
-homepage = "https://github.com/krsnik02/regex-lexer/"
-repository = "https://github.com/krsnik02/regex-lexer/"
+homepage = "https://github.com/sandeep-datta/regex-lexer-lalrpop"
+repository = "https://github.com/sandeep-datta/regex-lexer-lalrpop"
 license = "MIT OR Apache-2.0"
 keywords = ["lexer", "tokenizer", "regex", "parsing"]
 categories = ["parsing"]
-
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 regex = "1"
