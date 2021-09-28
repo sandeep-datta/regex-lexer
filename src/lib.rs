@@ -2,7 +2,7 @@
 //! A regex-based lexer (tokenizer).
 //!
 //! ```
-//! use regex_lexer::LexerBuilder;
+//! use regex_lexer_lalrpop::LexerBuilder;
 //!
 //! #[derive(Debug, PartialEq, Eq)]
 //! enum Token {
@@ -37,12 +37,32 @@
 //! # Ok::<(), regex::Error>(())
 //! ```
 
+use std::fmt;
 use regex::{Regex, RegexSet};
+
+/// Location in text file being lexed.
+#[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord)]
+pub struct Location {
+    line: u32,
+    column: u32,
+}
+
+impl Location {
+    fn new(line: u32, column: u32) -> Self {
+        Location { line, column }
+    }
+}
+
+impl fmt::Debug for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.line, self.column)
+    }
+}
 
 /// Builder struct for [Lexer](struct.Lexer.html).
 pub struct LexerBuilder<'r, 't, T: 't> {
     regexes: Vec<&'r str>,
-    fns: Vec<Box<dyn Fn(usize, &'t str, usize) -> Option<T>>>,
+    fns: Vec<Box<dyn Fn(Location, &'t str, Location) -> Option<T>>>,
 }
 
 impl<'r, 't, T: 't> std::fmt::Debug for LexerBuilder<'r, 't, T> {
@@ -82,7 +102,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     ///     // ...
     /// }
     ///
-    /// let lexer = regex_lexer::LexerBuilder::new()
+    /// let lexer = regex_lexer_lalrpop::LexerBuilder::new()
     ///     .token(r"[0-9]*", |_, num, _| Some(Token::Num(num.parse().unwrap())))
     ///     .token(r"\s+", |_, _, _| None) // skip whitespace
     ///     // ...
@@ -105,7 +125,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     ///     // ...
     /// }
     ///
-    /// let lexer = regex_lexer::LexerBuilder::new()
+    /// let lexer = regex_lexer_lalrpop::LexerBuilder::new()
     ///     .token(r"[a-zA-Z_][a-zA-Z0-9_]*", |_, id, _| Some(Token::Ident(id)))
     ///     .token(r"then", |_, _, _| Some(Token::Then))
     ///     // ...
@@ -117,7 +137,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
     /// ```
     pub fn token<F>(mut self, re: &'r str, f: F) -> Self
     where
-        F: Fn(usize, &'t str, usize) -> Option<T> + 'static,
+        F: Fn(Location, &'t str, Location) -> Option<T> + 'static,
     {
         self.regexes.push(re);
         self.fns.push(Box::new(f));
@@ -154,7 +174,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
 ///     // ...
 /// }
 ///
-/// let lexer = regex_lexer::LexerBuilder::new()
+/// let lexer = regex_lexer_lalrpop::LexerBuilder::new()
 ///     .token(r"\p{XID_Start}\p{XID_Continue}*", |_, id, _| Some(Token::Ident(id)))
 ///     .token(r"\s+", |_, _, _| None) // skip whitespace
 ///     // ...
@@ -169,7 +189,7 @@ impl<'r, 't, T: 't> LexerBuilder<'r, 't, T> {
 /// # Ok::<(), regex::Error>(())
 /// ```
 pub struct Lexer<'t, T: 't> {
-    fns: Vec<Box<dyn Fn(usize, &'t str, usize) -> Option<T>>>,
+    fns: Vec<Box<dyn Fn(Location, &'t str, Location) -> Option<T>>>,
     regexes: Vec<Regex>,
     regex_set: RegexSet,
 }
@@ -207,6 +227,13 @@ pub struct Tokens<'l, 't, T: 't> {
     position: usize,
 }
 
+fn get_line_column<'input>(input: &'input str, offset: usize) -> Location {
+    let (before, _after) = input.split_at(offset);
+    let line = before.chars().filter(|&c| c == '\n').count() + 1;
+    let column = before.chars().rev().take_while(|&c| c != '\n').count() + 1;
+    Location::new(line as u32, column as u32)
+}
+
 impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
     type Item = Result<T, usize>;
 
@@ -238,7 +265,10 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
             let start = self.position;
             self.position += len;
             let func = &self.lexer.fns[i];
-            match func(start, tok_str, self.position) {
+            match func(get_line_column(self.source, start), 
+                        tok_str, 
+                        get_line_column(self.source, self.position))
+            {
                 Some(tok) => return Some(Ok(tok)),
                 None => {}
             }
