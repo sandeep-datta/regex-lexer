@@ -43,17 +43,34 @@ use regex::{Regex, RegexSet};
 /// Location in text file being lexed.
 #[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord)]
 pub struct Location {
-    line: u32,
-    column: u32,
+    pub line: u32,
+    pub column: u32,
 }
 
 impl Location {
-    fn new(line: u32, column: u32) -> Self {
+    pub fn new(line: u32, column: u32) -> Self {
         Location { line, column }
+    }
+
+    pub fn from_offset<'input>(input: &'input str, offset: usize) -> Self {
+        let (before, _after) = input.split_at(offset);
+        let line = before.chars().filter(|&c| c == '\n').count() + 1;
+        let column = before.chars().rev().take_while(|&c| c != '\n').count() + 1;
+        Location::new(line as u32, column as u32)
+    }
+
+    pub fn zero() -> Self {
+        Location::new(0, 0)
     }
 }
 
 impl fmt::Debug for Location {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "({}, {})", self.line, self.column)
+    }
+}
+
+impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}, {})", self.line, self.column)
     }
@@ -227,13 +244,6 @@ pub struct Tokens<'l, 't, T: 't> {
     position: usize,
 }
 
-fn get_line_column<'input>(input: &'input str, offset: usize) -> Location {
-    let (before, _after) = input.split_at(offset);
-    let line = before.chars().filter(|&c| c == '\n').count() + 1;
-    let column = before.chars().rev().take_while(|&c| c != '\n').count() + 1;
-    Location::new(line as u32, column as u32)
-}
-
 impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
     type Item = Result<T, usize>;
 
@@ -265,9 +275,9 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
             let start = self.position;
             self.position += len;
             let func = &self.lexer.fns[i];
-            match func(get_line_column(self.source, start), 
+            match func(Location::from_offset(self.source, start), 
                         tok_str, 
-                        get_line_column(self.source, self.position))
+                        Location::from_offset(self.source, self.position))
             {
                 Some(tok) => return Some(Ok(tok)),
                 None => {}
