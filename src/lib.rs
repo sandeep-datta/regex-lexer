@@ -66,13 +66,13 @@ impl Location {
 
 impl fmt::Debug for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.line, self.column)
+        write!(f, "{}:{}", self.line, self.column)
     }
 }
 
 impl fmt::Display for Location {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}, {})", self.line, self.column)
+        write!(f, "{}:{}", self.line, self.column)
     }
 }
 
@@ -275,8 +275,8 @@ impl<'l, 't, T: 't> Iterator for Tokens<'l, 't, T> {
             let start = self.position;
             self.position += len;
             let func = &self.lexer.fns[i];
-            match func(Location::from_offset(self.source, start), 
-                        tok_str, 
+            match func(Location::from_offset(self.source, start),
+                        tok_str,
                         Location::from_offset(self.source, self.position))
             {
                 Some(tok) => return Some(Ok(tok)),
