@@ -37,11 +37,14 @@
 //! # Ok::<(), regex::Error>(())
 //! ```
 
+
 use std::fmt;
 use regex::{Regex, RegexSet};
+use serde::{Serialize, Deserialize};
+
 
 /// Location in text file being lexed.
-#[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Default, Eq, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Location {
     pub line: u32,
     pub column: u32,
